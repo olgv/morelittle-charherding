@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chars Herding</title>
+  <style>
+    body{margin:0;background:#000;position:relative;overscroll-behavior:none;overflow:hidden;height:100vh;-webkit-overflow-scrolling:none}
+    .char{color:#fff;font-size:15px;position:absolute;transform:translate(-50%,-50%);user-select:none;touch-action:none}
+    .grid{background-image:linear-gradient(to right,#505050 1px,transparent 1px),linear-gradient(to bottom,#505050 1px,transparent 1px);background-size:20px 20px}
+    .controls{position:absolute;top:0;left:0;color:#fff;padding:5px 0 0;user-select:none;font-family:monospace;z-index:100}
+    .controls div,.controls label{display:flex;flex-wrap:wrap}
+    .controls span{font-size:12px;width:20px;height:20px;text-align:center;display:inline-block}
+    .controls input{width:15px;height:15px;margin:-2px 0 0 3px}
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div><span>C</span><span>L</span><span>I</span><span>C</span><span>K</span><span>&nbsp;</span><span>A</span><span>N</span><span>D</span><span>&nbsp;</span><span>D</span><span>R</span><span>A</span><span>G</span></div>
+    <label><input type="checkbox" id="g"><span style="margin-left:2px">S</span><span>H</span><span>O</span><span>W</span><span>&nbsp;</span><span>G</span><span>R</span><span>I</span><span>D</span></label>
+  </div>
+  
+  <script>
+    const chars="→,⇶,↑,↖︎,/,|,_,●,●,⊉,∆,≿,∟,∗,⊕,⊥,⊼,⋓,⨀".split(','),
+          g=20, // Grid size in pixels (matches background-size in CSS)
+          d=document,
+          b=d.body,
+          isMobile=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    let isDrag=false,
+        positions=[],
+        elements=[];
+
+    const init=()=>{
+      const w=~~(innerWidth/g),
+            h=~~(innerHeight/g),
+            total=Math.min(isMobile ? 250 : 500,w*h); // Adjust the number of characters "Mobile : Desktop"
+      
+      for(let i=0;i<w;i++)
+        for(let j=0;j<h;j++)
+          positions.push({x:i,y:j});
+      
+      shuffle(positions);
+      createChars(total);
+      addEvents();
+    };
+
+    const shuffle=a=>{
+      for(let i=a.length-1;i>0;i--){
+        const j=~~(Math.random()*i);
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+    };
+
+    const createChars=n=>{
+      const f=d.createDocumentFragment();
+      for(let i=0;i<n;i++){
+        const el=d.createElement('div'),
+              p=positions[i];
+        el.className='char';
+        el.textContent=chars[~~(Math.random()*chars.length)];
+        el.style.cssText=`left:${p.x*g+g/2}px;top:${p.y*g+g/2}px`;
+        f.appendChild(el);
+        elements.push({el,pos:p});
+      }
+      b.appendChild(f);
+    };
+
+    const redistribute=(x,y,r=isMobile ? 100 : 270)=>{ // Click radius "Mobile : Desktop"
+      const affected=elements.filter(({el,pos})=>
+        Math.hypot(x-(pos.x*g+g/2),y-(pos.y*g+g/2))<=r
+      );
+      if(!affected.length)return;
+
+      // Remove affected elements from DOM and elements array
+      const remainingElements = elements.filter(item => !affected.includes(item));
+      affected.forEach(({el}) => b.removeChild(el));
+      elements = remainingElements;
+
+      // Get available positions excluding current element positions
+      const usedPositions = new Set(elements.map(({pos}) => `${pos.x},${pos.y}`));
+      const availablePositions = positions.filter(p => !usedPositions.has(`${p.x},${p.y}`));
+      shuffle(availablePositions);
+
+      // Add affected elements back at new positions
+      const f=d.createDocumentFragment();
+      affected.forEach(({el},i)=>{
+        if(i<availablePositions.length){
+          const p=availablePositions[i];
+          el.style.cssText=`left:${p.x*g+g/2}px;top:${p.y*g+g/2}px`;
+          f.appendChild(el);
+          elements.push({el,pos:p});
+        }
+      });
+      b.appendChild(f);
+    };
+
+    const addEvents=()=>{
+      const handle=(e)=>{
+        if(e.target.closest('.controls')) return;
+        e.preventDefault();
+        const touch = e.touches?.[0] || e;
+        redistribute(touch.clientX,touch.clientY);
+      };
+
+      if(isMobile){
+        d.addEventListener('touchstart',e=>{
+          if(e.target.closest('.controls')) return;
+          isDrag=true;
+          handle(e);
+        },{passive:false});
+        d.addEventListener('touchmove',e=>{isDrag&&handle(e)},{passive:false});
+        d.addEventListener('touchend',()=>isDrag=false);
+        d.addEventListener('touchcancel',()=>isDrag=false);
+      } else {
+        d.addEventListener('mousedown',e=>{isDrag=true;redistribute(e.clientX,e.clientY)});
+        d.addEventListener('mousemove',e=>isDrag&&redistribute(e.clientX,e.clientY));
+        d.addEventListener('mouseup',()=>isDrag=false);
+        d.addEventListener('mouseleave',()=>isDrag=false);
+      }
+      d.getElementById('g').onchange=e=>b.classList[e.target.checked?'add':'remove']('grid');
+    };
+
+    init();
+  </script>
+</body>
+</html>
